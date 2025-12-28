@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  
+  db:
+    image: postgres:15-alpine
+    container_name: art_platform_db
+    restart: always
+    environment:
+      POSTGRES_USER: myuser         
+      POSTGRES_PASSWORD: mypassword 
+      POSTGRES_DB: artdb          
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data # Persist data
+
+  
+  server:
+    build: ./backend
+    container_name: art_platform_server
+    ports:
+      - "5000:5000"
+    environment:
+      
+      DATABASE_URL: postgres://myuser:mypassword@db:5432/artdb
+      PORT: 5000
+    depends_on:
+      - db
+    volumes:
+      - ./backend:/app             
+      - /app/node_modules         
+
+
+  web:
+    build: ./web
+    container_name: art_platform_web
+    ports:
+      - "5173:5173"               
+    environment:
+      - VITE_API_URL=http://localhost:5000
+    depends_on:
+      - server
+    volumes:
+      - ./web:/app                 
+      - /app/node_modules          
+
+
+volumes:
+  pgdata:
