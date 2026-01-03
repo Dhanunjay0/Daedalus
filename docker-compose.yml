@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  # --- PostgreSQL Database ---
+  db:
+    image: postgres:15-alpine
+    container_name: daedulus_db
+    restart: always
+    environment:
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mypassword
+      POSTGRES_DB: daedulus_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # HEALTH CHECK ADDED HERE
+    healthcheck:
+      # pg_isready is a utility built into the postgres image
+      test: ["CMD-SHELL", "pg_isready -U myuser -d daedulus_db"]
+      interval: 5s    # Check every 5 seconds
+      timeout: 5s     # Fail if it takes longer than 5s
+      retries: 5      # Give up after 5 tries (25s total)
+
+  # --- Backend API ---
+  server:
+    build: ./backend
+    container_name: daedulus_server
+    ports:
+      - "5000:5000"
+    environment:
+      DATABASE_URL: postgres://myuser:mypassword@db:5432/daedulus_db
+      PORT: 5000
+    depends_on:
+      db:
+        # CRITICAL: Now we wait for "healthy", not just "started"
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+
+  # --- React Frontend ---
+  web:
+    build: ./web
+    container_name: daedulus_web
+    ports:
+      - "5173:5173"
+    environment:
+      # Ideally, web shouldn't crash if API is down, so standard depends_on is fine
+      - VITE_API_URL=http://localhost:5000
+    depends_on:
+      - server
+    volumes:
+      - ./web:/app
+      - /app/node_modules
+
+volumes:
+  pgdata:
